@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 from src.analyzer import JobApplicationAnalysis, analyze_application
 
-# Load environment variables from .env (OPENAI_API_KEY, optional model overrides)
+# Load environment variables from .env (GROQ_API_KEY, optional model overrides)
 load_dotenv()
 
 st.set_page_config(
@@ -104,16 +104,16 @@ with st.sidebar:
     analyze_clicked = st.button("Analyze Application", type="primary", use_container_width=True)
 
     st.divider()
-    st.caption("Requires OPENAI_API_KEY in a `.env` file. See README for setup.")
+    st.caption("Requires GROQ_API_KEY in a `.env` file. See README for setup.")
 
 # --- Main area: validation + analysis ---
 if analyze_clicked:
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("GROQ_API_KEY")
 
-    if not api_key or api_key.strip() in ("", "sk-your-openai-api-key-here"):
+    if not api_key or api_key.strip() in ("", "gsk-your-groq-api-key-here"):
         st.error(
-            "OpenAI API key is missing. Copy `.env.example` to `.env` "
-            "and set your `OPENAI_API_KEY`."
+            "Groq API key is missing. Copy `.env.example` to `.env` "
+            "and set your `GROQ_API_KEY`."
         )
     elif uploaded_cv is None:
         st.error("Please upload your CV as a PDF before analyzing.")
@@ -133,6 +133,8 @@ if analyze_clicked:
                 st.error(str(exc))
             except Exception as exc:
                 st.error(f"Something went wrong during analysis: {exc}")
-                st.caption("Check your API key, network connection, and that the PDF contains extractable text.")
+                st.caption(
+                    "Check your Groq API key, network connection, and that the PDF contains extractable text."
+                )
 else:
     st.info("Upload a CV and job description in the sidebar, then click **Analyze Application**.")

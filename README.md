@@ -1,34 +1,37 @@
 # Job Application Copilot
 
-A Streamlit MVP that helps students and job seekers tailor job applications using LangChain, OpenAI, and RAG (Retrieval-Augmented Generation).
+A Streamlit MVP that helps students and job seekers tailor job applications using LangChain, **Groq**, and RAG (Retrieval-Augmented Generation).
 
 Upload your CV (PDF), paste a job description, and get:
 
-1. **Match score** — how well your CV aligns with the role  
-2. **Required skills** — from the job description  
-3. **Matching skills** — already present in your CV  
-4. **Missing skills** — gaps to address  
-5. **Tailored resume summary**  
-6. **5 improved CV bullet points** (grounded in your real experience)  
-7. **Cover letter draft**  
-8. **10 interview questions** tailored to the job and your CV  
+1. **Match score** — how well your CV aligns with the role
+2. **Required skills** — from the job description
+3. **Matching skills** — already present in your CV
+4. **Missing skills** — gaps to address
+5. **Tailored resume summary**
+6. **5 improved CV bullet points** (grounded in your real experience)
+7. **Cover letter draft**
+8. **10 interview questions** tailored to the job and your CV
 
 ## How it works
 
 ```
-CV PDF → extract text → chunk → embed → ChromaDB
-                                              ↓
+CV PDF → extract text → chunk → local embed → ChromaDB
+                                                    ↓
 Job description → retrieve relevant CV chunks (RAG)
-                                              ↓
-                    LLM structured analysis → Streamlit UI
+                                                    ↓
+                    Groq LLM structured analysis → Streamlit UI
 ```
+
+- **Groq** powers the chat/analysis LLM (fast inference).
+- **Local HuggingFace embeddings** power RAG (Groq has no embeddings API — no extra key needed).
 
 The app **never invents experience** — prompts require the model to use only facts from your uploaded CV.
 
 ## Prerequisites
 
 - Python 3.10+
-- An [OpenAI API key](https://platform.openai.com/api-keys)
+- A [Groq API key](https://console.groq.com/keys) (free tier available)
 
 ## Installation
 
@@ -45,7 +48,7 @@ pip install -r requirements.txt
 
 # Configure API key
 cp .env.example .env
-# Edit .env and set OPENAI_API_KEY=sk-...
+# Edit .env and set GROQ_API_KEY=gsk-...
 ```
 
 ## Run the app
@@ -66,7 +69,7 @@ job-application-copilot/
 ├── README.md
 └── src/
     ├── cv_loader.py    # PDF extraction and text chunking
-    ├── rag.py          # Embeddings + Chroma retrieval
+    ├── rag.py          # Local embeddings + Chroma retrieval
     ├── prompts.py      # LangChain prompt templates
     └── analyzer.py     # Analysis pipeline + structured output
 ```
@@ -75,32 +78,35 @@ job-application-copilot/
 
 | Variable | Required | Default |
 |----------|----------|---------|
-| `OPENAI_API_KEY` | Yes | — |
-| `OPENAI_MODEL` | No | `gpt-4o-mini` |
-| `OPENAI_EMBEDDING_MODEL` | No | `text-embedding-3-small` |
+| `GROQ_API_KEY` | Yes | — |
+| `GROQ_MODEL` | No | `llama-3.3-70b-versatile` |
+| `EMBEDDING_MODEL` | No | `sentence-transformers/all-MiniLM-L6-v2` |
+
+Other Groq models you can try: `llama-3.1-8b-instant` (faster), `mixtral-8x7b-32768`.
 
 ## MVP scope (included)
 
-- PDF CV upload  
-- Job description input  
-- RAG over CV chunks  
-- Structured AI analysis  
-- Clean Streamlit output sections  
+- PDF CV upload
+- Job description input
+- RAG over CV chunks (local embeddings)
+- Structured Groq analysis
+- Clean Streamlit output sections
 
 ## Out of scope (future)
 
-- User login / accounts  
-- Dashboard  
-- Gmail / calendar integration  
-- Database persistence  
+- User login / accounts
+- Dashboard
+- Gmail / calendar integration
+- Database persistence
 
 ## Troubleshooting
 
 | Issue | Fix |
 |-------|-----|
 | "Could not extract text from PDF" | Use a text-based PDF, not a scanned image |
-| Missing API key error | Create `.env` from `.env.example` and set `OPENAI_API_KEY` |
-| Slow first run | Chroma and LangChain may download models on first use |
+| Missing API key error | Create `.env` from `.env.example` and set `GROQ_API_KEY` |
+| Slow first run | The embedding model downloads once (~90 MB) on first analysis |
+| Groq rate limit | Try `GROQ_MODEL=llama-3.1-8b-instant` or wait and retry |
 
 ## License
 

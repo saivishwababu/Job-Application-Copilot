@@ -1,25 +1,26 @@
 """
 RAG (Retrieval-Augmented Generation) for CV context.
 
-Embeds CV chunks with OpenAI, stores them in an ephemeral ChromaDB
-collection, and retrieves the most relevant excerpts for a job description.
+Embeds CV chunks with a local HuggingFace model (Groq has no embeddings API),
+stores them in an ephemeral ChromaDB collection, and retrieves the most
+relevant excerpts for a job description.
 """
 
 import chromadb
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
-from langchain_openai import OpenAIEmbeddings
 
 
 def build_cv_vectorstore(
     chunks: list[str],
-    api_key: str,
-    embedding_model: str = "text-embedding-3-small",
+    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
 ) -> Chroma:
     """
     Create an in-memory Chroma vector store from CV text chunks.
 
-    Uses EphemeralClient so nothing is persisted to disk between runs.
+    Uses a local sentence-transformers model for embeddings (free, no API key).
+    EphemeralClient keeps everything in memory for the session.
     """
     if not chunks:
         raise ValueError("No CV chunks available to embed.")
@@ -29,12 +30,8 @@ def build_cv_vectorstore(
         for i, chunk in enumerate(chunks)
     ]
 
-    embeddings = OpenAIEmbeddings(
-        api_key=api_key,
-        model=embedding_model,
-    )
+    embeddings = HuggingFaceEmbeddings(model_name=embedding_model)
 
-    # Ephemeral client = in-memory only, ideal for a single-session MVP
     client = chromadb.EphemeralClient()
     vectorstore = Chroma.from_documents(
         documents=documents,

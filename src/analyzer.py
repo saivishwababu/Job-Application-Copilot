@@ -1,17 +1,17 @@
 """
-Job application analyzer using LangChain + OpenAI structured output.
+Job application analyzer using LangChain + Groq structured output.
 
 Pipeline:
-1. Split CV into chunks and build a vector store (RAG)
+1. Split CV into chunks and build a vector store (RAG, local embeddings)
 2. Retrieve CV excerpts relevant to the job description
-3. Send CV context + job description to the LLM
+3. Send CV context + job description to Groq LLM
 4. Return a validated Pydantic object with all analysis fields
 """
 
 import os
 from typing import Optional
 
-from langchain_openai import ChatOpenAI
+from langchain_groq import ChatGroq
 from pydantic import BaseModel, Field
 
 from src.cv_loader import extract_text_from_pdf, split_cv_into_chunks
@@ -63,17 +63,17 @@ def analyze_application(
     Args:
         pdf_bytes: Raw bytes of the uploaded CV PDF.
         job_description: Target job description text.
-        api_key: OpenAI API key (falls back to OPENAI_API_KEY env var).
-        model: Chat model name (falls back to OPENAI_MODEL or gpt-4o-mini).
-        embedding_model: Embeddings model (falls back to OPENAI_EMBEDDING_MODEL).
+        api_key: Groq API key (falls back to GROQ_API_KEY env var).
+        model: Chat model name (falls back to GROQ_MODEL or llama-3.3-70b-versatile).
+        embedding_model: Local HuggingFace model for RAG embeddings.
 
     Returns:
         Validated JobApplicationAnalysis with all eight output sections.
     """
-    resolved_api_key = api_key or os.getenv("OPENAI_API_KEY")
+    resolved_api_key = api_key or os.getenv("GROQ_API_KEY")
     if not resolved_api_key:
         raise ValueError(
-            "OpenAI API key is missing. Set OPENAI_API_KEY in your .env file."
+            "Groq API key is missing. Set GROQ_API_KEY in your .env file."
         )
 
     job_description = job_description.strip()
@@ -84,20 +84,20 @@ def analyze_application(
     cv_full_text = extract_text_from_pdf(pdf_bytes)
     cv_chunks = split_cv_into_chunks(cv_full_text)
 
-    # Step 2: Embed chunks and store in Chroma (RAG index)
+    # Step 2: Embed chunks locally and store in Chroma (RAG index)
     vectorstore = build_cv_vectorstore(
         chunks=cv_chunks,
-        api_key=resolved_api_key,
-        embedding_model=embedding_model or os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"),
+        embedding_model=embedding_model
+        or os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"),
     )
 
     # Step 3: Retrieve CV excerpts most relevant to the job description
     cv_context = retrieve_relevant_cv_context(vectorstore, job_description, k=6)
 
-    # Step 4: Call LLM with structured output
-    llm = ChatOpenAI(
+    # Step 4: Call Groq LLM with structured output
+    llm = ChatGroq(
         api_key=resolved_api_key,
-        model=model or os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        model=model or os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
         temperature=0.3,
     )
     structured_llm = llm.with_structured_output(JobApplicationAnalysis)
