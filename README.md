@@ -1,78 +1,43 @@
-# Job Application Copilot
+# Job Application Copilot V1
 
-A Streamlit MVP that helps students and job seekers tailor job applications using LangChain, **Groq**, and RAG (Retrieval-Augmented Generation).
+A Streamlit app that helps students and job seekers manage job applications end-to-end: analyze fit, tailor resumes, write cover letters, prepare for interviews, and track every application.
 
-Upload your CV (PDF), paste a job description, and get:
+## Features (V1)
 
-1. **Match score** — how well your CV aligns with the role
-2. **Required skills** — from the job description
-3. **Matching skills** — already present in your CV
-4. **Missing skills** — gaps to address
-5. **Tailored resume summary**
-6. **5 improved CV bullet points** (grounded in your real experience)
-7. **Cover letter draft**
-8. **10 interview questions** tailored to the job and your CV
-
-## How it works
-
-```
-CV PDF → extract text → chunk → local embed → ChromaDB
-                                                    ↓
-Job description → retrieve relevant CV chunks (RAG)
-                                                    ↓
-                    Groq LLM structured analysis → Streamlit UI
-```
-
-- **Groq** powers the chat/analysis LLM (fast inference).
-- **Local HuggingFace embeddings** power RAG (Groq has no embeddings API — no extra key needed).
-
-The app **never invents experience** — prompts require the model to use only facts from your uploaded CV.
+| Tab | What it does |
+|-----|--------------|
+| **Upload & Analyze** | Extract JD skills/requirements, compare against CV, fit score + gaps |
+| **Resume Tailoring** | Tailored summary + 5 improved bullets grounded in your CV |
+| **Cover Letter** | Short application email + full cover letter |
+| **Interview Prep** | Technical, behavioral, and role questions with suggested answers |
+| **Application Tracker** | SQLite-backed tracker with status pipeline |
 
 ## Prerequisites
 
 - Python 3.10+
-- A [Groq API key](https://console.groq.com/keys) (free tier available)
+- [Groq API key](https://console.groq.com/keys)
 
 ## Installation
 
 ```bash
-# Clone or navigate to the project folder
 cd job-application-copilot
 
-# Create and activate a virtual environment (recommended)
 python3 -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
 
-# Install dependencies
 pip install -r requirements.txt
 
-# Configure API key
 cp .env.example .env
 # Edit .env and set GROQ_API_KEY=gsk-...
 ```
 
-## Run the app
+## Run
 
 ```bash
 streamlit run app.py
 ```
 
-Open the URL shown in the terminal (usually `http://localhost:8501`).
-
-## Project structure
-
-```
-job-application-copilot/
-├── app.py              # Streamlit UI
-├── requirements.txt
-├── .env.example
-├── README.md
-└── src/
-    ├── cv_loader.py    # PDF extraction and text chunking
-    ├── rag.py          # Local embeddings + Chroma retrieval
-    ├── prompts.py      # LangChain prompt templates
-    └── analyzer.py     # Analysis pipeline + structured output
-```
+Open `http://localhost:8501`.
 
 ## Environment variables
 
@@ -82,32 +47,45 @@ job-application-copilot/
 | `GROQ_MODEL` | No | `llama-3.3-70b-versatile` |
 | `EMBEDDING_MODEL` | No | `sentence-transformers/all-MiniLM-L6-v2` |
 
-Other Groq models you can try: `llama-3.1-8b-instant` (faster), `mixtral-8x7b-32768`.
+## Project structure
 
-## MVP scope (included)
+```
+job-application-copilot/
+├── app.py                  # Streamlit UI (5 tabs)
+├── requirements.txt
+├── .env.example
+├── README.md
+├── data/                   # SQLite DB (auto-created, gitignored)
+└── src/
+    ├── llm_client.py       # Centralized Groq client
+    ├── cv_loader.py        # PDF extraction + chunking
+    ├── cv_context.py       # RAG context builder
+    ├── rag.py              # Chroma + local embeddings
+    ├── jd_parser.py        # JD skill/requirement extraction
+    ├── analyzer.py         # Upload & Analyze pipeline
+    ├── tailoring.py        # Resume tailoring
+    ├── cover_letter.py     # Email + cover letter
+    ├── interview_prep.py   # Interview Q&A
+    ├── tracker.py          # Application tracker API
+    ├── storage.py          # SQLite persistence
+    ├── models.py           # Pydantic schemas
+    ├── prompts.py          # All LLM prompts
+    └── utils.py            # Shared helpers
+```
 
-- PDF CV upload
-- Job description input
-- RAG over CV chunks (local embeddings)
-- Structured Groq analysis
-- Clean Streamlit output sections
+## Workflow
 
-## Out of scope (future)
+1. **Upload CV** (sidebar) and enter company, title, and job description.
+2. **Upload & Analyze** — run analysis; results are saved to SQLite automatically.
+3. **Resume Tailoring** — generate/regenerate tailored summary and bullets.
+4. **Cover Letter** — generate email + full letter (uses tailored content if available).
+5. **Interview Prep** — generate questions with CV-grounded answers.
+6. **Application Tracker** — view all apps, update status (`planned → applied → interview → rejected/offer`), reopen or delete.
 
-- User login / accounts
-- Dashboard
-- Gmail / calendar integration
-- Database persistence
+## Persistence
 
-## Troubleshooting
-
-| Issue | Fix |
-|-------|-----|
-| "Could not extract text from PDF" | Use a text-based PDF, not a scanned image |
-| Missing API key error | Create `.env` from `.env.example` and set `GROQ_API_KEY` |
-| Slow first run | The embedding model downloads once (~90 MB) on first analysis |
-| Groq rate limit | Try `GROQ_MODEL=llama-3.1-8b-instant` or wait and retry |
+Applications are stored in `data/applications.db` (SQLite). Each record includes company, role, JD, fit score, tailored content, cover letter, and interview prep.
 
 ## License
 
-MIT — use freely for learning and personal projects.
+MIT
