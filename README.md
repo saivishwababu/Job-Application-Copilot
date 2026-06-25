@@ -51,7 +51,7 @@ Open `http://localhost:8501`.
 
 ```
 job-application-copilot/
-├── app.py                  # Streamlit UI (5 tabs)
+├── app.py                  # Streamlit app
 ├── requirements.txt
 ├── .env.example
 ├── README.md
