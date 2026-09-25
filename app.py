@@ -147,6 +147,8 @@ NAV_TABS = [
     "Cover Letter",
     "Interview Prep",
     "Application Tracker",
+]
+
 from src.tracker import ApplicationTracker, SessionTracker
 
 
