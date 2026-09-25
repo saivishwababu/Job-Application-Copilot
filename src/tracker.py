@@ -1,23 +1,20 @@
 """
-Application tracker — high-level API over SQLite storage.
-
-Use this module from the Streamlit app instead of calling storage directly.
+Application tracker — Session-isolated storage for full privacy in multi-user deployments.
 """
 
 from typing import Optional
-
 from src.models import ApplicationRecord, ApplicationStatus
-from src.storage import (
-    delete_application,
-    get_application,
-    list_applications,
-    save_application,
-    update_status,
-)
 
 
-class ApplicationTracker:
-    """Manage job application records with create, read, update, delete."""
+class SessionTracker:
+    """
+    Manages application records scoped strictly to the current user's session.
+    Ensures that when the app is deployed publicly, no visitor can see another visitor's
+    CVs, jobs, cover letters, or saved applications.
+    """
+
+    def __init__(self, session_store: dict):
+        self.store = session_store
 
     def create(
         self,
@@ -33,24 +30,35 @@ class ApplicationTracker:
             job_description_text=job_description_text.strip(),
             cv_text=cv_text,
         )
-        return save_application(record)
+        return self.save(record)
 
     def save(self, record: ApplicationRecord) -> ApplicationRecord:
-        """Insert or update a full application record."""
-        return save_application(record)
+        """Insert or update a record in the user's private session."""
+        self.store[record.application_id] = record
+        return record
 
     def get(self, application_id: str) -> Optional[ApplicationRecord]:
-        """Fetch one application by ID."""
-        return get_application(application_id)
+        """Fetch one application by ID from the private session."""
+        return self.store.get(application_id)
 
     def list_all(self) -> list[ApplicationRecord]:
-        """List all applications, newest first."""
-        return list_applications()
+        """List all applications for this session, newest first."""
+        records = list(self.store.values())
+        records.sort(key=lambda r: r.date_created, reverse=True)
+        return records
 
     def set_status(self, application_id: str, status: ApplicationStatus) -> Optional[ApplicationRecord]:
         """Update application pipeline status."""
-        return update_status(application_id, status)
+        record = self.store.get(application_id)
+        if record:
+            record.status = status
+            return record
+        return None
 
     def delete(self, application_id: str) -> bool:
-        """Permanently delete an application."""
-        return delete_application(application_id)
+        """Permanently delete an application from the session."""
+        return bool(self.store.pop(application_id, None))
+
+
+# Alias for backward compatibility
+ApplicationTracker = SessionTracker

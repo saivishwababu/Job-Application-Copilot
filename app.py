@@ -147,9 +147,13 @@ NAV_TABS = [
     "Cover Letter",
     "Interview Prep",
     "Application Tracker",
-]
+from src.tracker import ApplicationTracker, SessionTracker
 
-tracker = ApplicationTracker()
+
+def get_tracker() -> SessionTracker:
+    if "_session_applications" not in st.session_state:
+        st.session_state._session_applications = {}
+    return SessionTracker(st.session_state._session_applications)
 
 
 # ---------------------------------------------------------------------------
@@ -194,6 +198,7 @@ def init_session_state() -> None:
         "applications_list": [],
         "_analysis": None,
         "active_tab": NAV_TABS[0],
+        "_session_applications": {},
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -204,7 +209,7 @@ def init_session_state() -> None:
 
     # Load from URL if app_id is passed and not loaded yet
     if url_app_id and url_app_id != st.session_state.current_app_id:
-        record = tracker.get(url_app_id)
+        record = get_tracker().get(url_app_id)
         if record:
             load_application_into_session(record, switch_tab=False)
 
@@ -218,7 +223,7 @@ def set_active_tab(tab_name: str) -> None:
 
 
 def refresh_applications_cache() -> None:
-    st.session_state.applications_list = tracker.list_all()
+    st.session_state.applications_list = get_tracker().list_all()
 
 
 def reset_for_new_application() -> None:
@@ -250,7 +255,7 @@ def get_current_record() -> ApplicationRecord | None:
     app_id = st.session_state.current_app_id
     if not app_id:
         return None
-    return tracker.get(app_id)
+    return get_tracker().get(app_id)
 
 
 def save_new_analysis(result) -> ApplicationRecord:
@@ -267,10 +272,10 @@ def save_new_analysis(result) -> ApplicationRecord:
         fit_score=result.fit_analysis.fit_score,
         fit_score_explanation=result.fit_analysis.fit_score_explanation,
     )
-    saved = tracker.save(record)
+    saved = get_tracker().save(record)
     st.session_state.current_app_id = saved.application_id
     st.session_state._analysis = result
-    st.query_params["app_id"] = saved.application_id
+    _set_query_param("app_id", saved.application_id)
     refresh_applications_cache()
     return saved
 
@@ -282,7 +287,7 @@ def save_current_record(**updates) -> ApplicationRecord:
     for key, value in updates.items():
         if hasattr(record, key):
             setattr(record, key, value)
-    saved = tracker.save(record)
+    saved = get_tracker().save(record)
     refresh_applications_cache()
     return saved
 
@@ -353,7 +358,7 @@ def render_sidebar() -> None:
                 if selected_id == "__new__":
                     reset_for_new_application()
                 else:
-                    rec = tracker.get(selected_id)
+                    rec = get_tracker().get(selected_id)
                     if rec:
                         load_application_into_session(rec, switch_tab=False)
                 st.rerun()
@@ -726,7 +731,7 @@ def page_application_tracker() -> None:
                     key=f"tracker_status_{app.application_id}",
                 )
                 if new_status != app.status:
-                    tracker.set_status(app.application_id, new_status)
+                    get_tracker().set_status(app.application_id, new_status)
                     refresh_applications_cache()
                     st.rerun()
             with hc3:
@@ -735,7 +740,7 @@ def page_application_tracker() -> None:
                     load_application_into_session(app, switch_tab=True, target_tab="Upload & Analyze")
                     st.rerun()
                 if st.button("🗑️ Delete", key=f"del_btn_{app.application_id}", use_container_width=True):
-                    tracker.delete(app.application_id)
+                    get_tracker().delete(app.application_id)
                     if st.session_state.current_app_id == app.application_id:
                         reset_for_new_application()
                     refresh_applications_cache()
@@ -745,6 +750,18 @@ def page_application_tracker() -> None:
                 st.caption(truncate(app.job_description_text, 250))
                 if app.extracted_skills:
                     st.markdown("**Skills:** " + ", ".join(app.extracted_skills[:8]))
+
+    # Export option
+    st.divider()
+    import json
+    apps_export = [a.model_dump() for a in apps]
+    st.download_button(
+        "📥 Export My Tracked Applications (JSON)",
+        data=json.dumps(apps_export, indent=2, ensure_ascii=False),
+        file_name="my_job_applications.json",
+        mime="application/json",
+        help="Download your session's job applications data to your computer",
+    )
 
 
 # ---------------------------------------------------------------------------
