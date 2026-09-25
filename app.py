@@ -1,5 +1,5 @@
 """
-Job Application Copilot V1 — Streamlit application.
+Job Application Copilot — Premium Streamlit Web Application.
 """
 
 import streamlit as st
@@ -18,24 +18,112 @@ load_dotenv()
 
 st.set_page_config(
     page_title="Job Application Copilot",
-    page_icon="📋",
+    page_icon="💼",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
+# ---------------------------------------------------------------------------
+# Custom CSS for modern design system
+# ---------------------------------------------------------------------------
 st.markdown(
     """
     <style>
-    div[data-testid="stSidebar"] { background-color: #f8fafc; }
-    .skill-match { color: #059669; }
-    .skill-missing { color: #dc2626; }
-    .skill-weak { color: #d97706; }
+    /* Global enhancements */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif;
+    }
+
+    /* Sidebar container styling */
+    div[data-testid="stSidebar"] {
+        padding-top: 1rem;
+    }
+    
+    /* Navigation Bar styling */
+    .nav-container {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+        flex-wrap: wrap;
+    }
+
+    /* Badges & Chips */
+    .skill-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.65rem;
+        border-radius: 9999px;
+        font-size: 0.825rem;
+        font-weight: 500;
+        margin: 0.2rem 0.3rem 0.2rem 0;
+        line-height: 1.3;
+    }
+    .skill-match {
+        background-color: rgba(16, 185, 129, 0.15);
+        color: #10b981;
+        border: 1px solid rgba(16, 185, 129, 0.35);
+    }
+    .skill-missing {
+        background-color: rgba(239, 68, 68, 0.15);
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.35);
+    }
+    .skill-weak {
+        background-color: rgba(245, 158, 11, 0.15);
+        color: #f59e0b;
+        border: 1px solid rgba(245, 158, 11, 0.35);
+    }
+
+    /* Score Card */
+    .score-box {
+        border-radius: 12px;
+        padding: 1.25rem;
+        border: 1px solid rgba(128, 128, 128, 0.2);
+        background: rgba(128, 128, 128, 0.05);
+        margin-bottom: 1.5rem;
+    }
+
+    /* Bullet Cards */
     .bullet-card {
-        background: #f9fafb;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        padding: 1rem;
-        margin-bottom: 0.75rem;
+        border-radius: 10px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 1rem;
+        border: 1px solid rgba(128, 128, 128, 0.2);
+        background: rgba(128, 128, 128, 0.03);
+    }
+    .bullet-diff-orig {
+        color: #888888;
+        text-decoration: line-through;
+        font-size: 0.95rem;
+        margin-bottom: 0.4rem;
+    }
+    .bullet-diff-new {
+        color: #10b981;
+        font-weight: 500;
+        font-size: 1rem;
+        margin-bottom: 0.4rem;
+    }
+    .bullet-tag {
+        display: inline-block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.15rem 0.5rem;
+        border-radius: 4px;
+        background: rgba(99, 102, 241, 0.15);
+        color: #6366f1;
+        margin-bottom: 0.5rem;
+    }
+
+    /* Quick action buttons row */
+    .action-row {
+        display: flex;
+        gap: 0.75rem;
+        margin-top: 1.25rem;
+        flex-wrap: wrap;
     }
     </style>
     """,
@@ -46,21 +134,57 @@ STATUS_OPTIONS: list[ApplicationStatus] = [
     "planned", "applied", "interview", "rejected", "offer"
 ]
 STATUS_LABELS = {
-    "planned": "Planned",
-    "applied": "Applied",
-    "interview": "Interview",
-    "rejected": "Rejected",
-    "offer": "Offer",
+    "planned": "📋 Planned",
+    "applied": "🚀 Applied",
+    "interview": "🎯 Interview",
+    "rejected": "❌ Rejected",
+    "offer": "🎉 Offer",
 }
+
+NAV_TABS = [
+    "Upload & Analyze",
+    "Resume Tailoring",
+    "Cover Letter",
+    "Interview Prep",
+    "Application Tracker",
+]
 
 tracker = ApplicationTracker()
 
 
 # ---------------------------------------------------------------------------
-# Session state
+# Session State & URL Query Parameter Synchronization
 # ---------------------------------------------------------------------------
 
+def _get_query_param(key: str) -> str | None:
+    try:
+        val = st.query_params.get(key)
+        if isinstance(val, list):
+            return val[0] if val else None
+        return val
+    except Exception:
+        return None
+
+
+def _set_query_param(key: str, val: str) -> None:
+    try:
+        st.query_params[key] = val
+    except Exception:
+        pass
+
+
+def _del_query_param(key: str) -> None:
+    try:
+        if key in st.query_params:
+            del st.query_params[key]
+    except Exception:
+        pass
+
+
 def init_session_state() -> None:
+    url_app_id = _get_query_param("app_id")
+    url_tab = _get_query_param("tab")
+
     defaults = {
         "cv_text": None,
         "current_app_id": None,
@@ -69,30 +193,47 @@ def init_session_state() -> None:
         "job_description": "",
         "applications_list": [],
         "_analysis": None,
+        "active_tab": NAV_TABS[0],
     }
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
+
     if not st.session_state.applications_list:
         refresh_applications_cache()
 
+    # Load from URL if app_id is passed and not loaded yet
+    if url_app_id and url_app_id != st.session_state.current_app_id:
+        record = tracker.get(url_app_id)
+        if record:
+            load_application_into_session(record, switch_tab=False)
+
+    if url_tab and url_tab in NAV_TABS:
+        st.session_state.active_tab = url_tab
+
+
+def set_active_tab(tab_name: str) -> None:
+    st.session_state.active_tab = tab_name
+    _set_query_param("tab", tab_name)
+
 
 def refresh_applications_cache() -> None:
-    """Reload saved applications from SQLite into session state."""
     st.session_state.applications_list = tracker.list_all()
 
 
 def reset_for_new_application() -> None:
-    """Clear current application so the next analyze creates a new record."""
+    """Clear inputs to start analyzing a brand new application."""
     st.session_state.current_app_id = None
     st.session_state.company_name = ""
     st.session_state.job_title = ""
     st.session_state.job_description = ""
     st.session_state._analysis = None
+    st.session_state.active_tab = "Upload & Analyze"
+    _del_query_param("app_id")
+    _set_query_param("tab", "Upload & Analyze")
 
 
-def load_application_into_session(record: ApplicationRecord) -> None:
-    """Populate session state from a saved application."""
+def load_application_into_session(record: ApplicationRecord, switch_tab: bool = True, target_tab: str = "Upload & Analyze") -> None:
     st.session_state.current_app_id = record.application_id
     st.session_state.company_name = record.company_name
     st.session_state.job_title = record.job_title
@@ -100,10 +241,12 @@ def load_application_into_session(record: ApplicationRecord) -> None:
     if record.cv_text:
         st.session_state.cv_text = record.cv_text
     st.session_state._analysis = None
+    _set_query_param("app_id", record.application_id)
+    if switch_tab:
+        set_active_tab(target_tab)
 
 
 def get_current_record() -> ApplicationRecord | None:
-    """Fetch the currently selected application from the database."""
     app_id = st.session_state.current_app_id
     if not app_id:
         return None
@@ -111,10 +254,9 @@ def get_current_record() -> ApplicationRecord | None:
 
 
 def save_new_analysis(result) -> ApplicationRecord:
-    """Always create a brand-new application record after analysis."""
     record = ApplicationRecord(
-        company_name=st.session_state.company_name.strip() or "Unknown Company",
-        job_title=st.session_state.job_title.strip() or "Unknown Role",
+        company_name=st.session_state.company_name.strip() or "Target Company",
+        job_title=st.session_state.job_title.strip() or "Target Role",
         job_description_text=st.session_state.job_description.strip(),
         cv_text=result.cv_text,
         extracted_skills=result.jd_extraction.required_skills,
@@ -128,12 +270,12 @@ def save_new_analysis(result) -> ApplicationRecord:
     saved = tracker.save(record)
     st.session_state.current_app_id = saved.application_id
     st.session_state._analysis = result
+    st.query_params["app_id"] = saved.application_id
     refresh_applications_cache()
     return saved
 
 
 def save_current_record(**updates) -> ApplicationRecord:
-    """Update the currently selected application."""
     record = get_current_record()
     if not record:
         raise ValueError("No application selected. Run Analyze first.")
@@ -150,143 +292,150 @@ def check_api_key() -> bool:
         get_groq_api_key()
         return True
     except ValueError as exc:
-        st.error(str(exc))
+        st.error(f"⚠️ {exc}")
         return False
 
 
 def require_cv_and_jd() -> bool:
     if not st.session_state.cv_text:
-        st.warning("Upload your CV in the sidebar.")
+        st.warning("📄 Please upload your CV in the sidebar.")
         return False
     if not st.session_state.job_description.strip():
-        st.warning("Enter a job description in the sidebar.")
-        return False
-    if not st.session_state.company_name.strip():
-        st.warning("Enter the company name in the sidebar.")
-        return False
-    if not st.session_state.job_title.strip():
-        st.warning("Enter the job title in the sidebar.")
+        st.warning("📝 Please enter a Job Description in the sidebar.")
         return False
     if not st.session_state.current_app_id:
-        st.warning("Run Analyze on the Upload & Analyze tab first.")
+        st.info("💡 Run 'Analyze Application' on the **Upload & Analyze** tab first.")
+        if st.button("👉 Go to Upload & Analyze", key="goto_analyze_btn"):
+            set_active_tab("Upload & Analyze")
+            st.rerun()
         return False
     return True
 
 
 # ---------------------------------------------------------------------------
-# Sidebar
+# Sidebar (Clean, Modern Redesign)
 # ---------------------------------------------------------------------------
 
 def render_sidebar() -> None:
     with st.sidebar:
-        st.markdown("### Job Application Copilot")
-        st.divider()
+        st.title("💼 Job Copilot")
+        st.caption("AI-Powered Application Assistant")
 
-        uploaded_cv = st.file_uploader("CV (PDF)", type=["pdf"])
-        if uploaded_cv is not None:
-            try:
-                from src.cv_loader import extract_text_from_pdf
-
-                pdf_bytes = uploaded_cv.read()
-                st.session_state._pdf_bytes = pdf_bytes
-                st.session_state.cv_text = extract_text_from_pdf(pdf_bytes)
-                st.success("CV loaded")
-            except Exception as exc:
-                st.error(str(exc))
-        elif st.session_state.cv_text:
-            st.caption("CV ready")
+        # Top Action: Create New or Pick Saved
+        if st.button("➕ Start New Application", use_container_width=True, type="primary"):
+            reset_for_new_application()
+            st.rerun()
 
         st.divider()
-        st.session_state.company_name = st.text_input(
-            "Company",
-            value=st.session_state.company_name,
-        )
-        st.session_state.job_title = st.text_input(
-            "Job title",
-            value=st.session_state.job_title,
-        )
-        st.session_state.job_description = st.text_area(
-            "Job description",
-            value=st.session_state.job_description,
-            height=180,
-        )
 
-        col_a, col_b = st.columns(2)
-        with col_a:
-            if st.button("New job", use_container_width=True):
-                reset_for_new_application()
-                st.rerun()
-        with col_b:
-            if st.button("Refresh list", use_container_width=True):
-                refresh_applications_cache()
-                st.rerun()
-
-        st.divider()
-        st.markdown("**Saved applications**")
-        apps: list[ApplicationRecord] = st.session_state.applications_list
-
+        # Saved Applications selector
+        apps = st.session_state.applications_list
         if apps:
             app_ids = [a.application_id for a in apps]
             labels = {
-                a.application_id: f"{a.company_name} — {a.job_title} ({STATUS_LABELS[a.status]})"
+                a.application_id: f"{a.company_name} — {a.job_title} ({STATUS_LABELS.get(a.status, a.status)})"
                 for a in apps
             }
-            current_index = 0
+            options = ["__new__", *app_ids]
+            
+            cur_idx = 0
             if st.session_state.current_app_id in app_ids:
-                current_index = app_ids.index(st.session_state.current_app_id)
+                cur_idx = options.index(st.session_state.current_app_id)
 
-            picked_id = st.selectbox(
-                "Select application",
-                options=app_ids,
-                index=current_index,
-                format_func=lambda x: labels[x],
-                key="sidebar_app_picker",
+            selected_id = st.selectbox(
+                "📂 Load Saved Application",
+                options=options,
+                index=cur_idx,
+                format_func=lambda x: "✨ [New Application]" if x == "__new__" else labels.get(x, x),
+                help="Switch between saved job applications",
             )
-            if picked_id != st.session_state.current_app_id:
-                record = tracker.get(picked_id)
-                if record:
-                    load_application_into_session(record)
-                    st.rerun()
-        else:
-            st.caption("No saved applications yet.")
+            if selected_id != (st.session_state.current_app_id or "__new__"):
+                if selected_id == "__new__":
+                    reset_for_new_application()
+                else:
+                    rec = tracker.get(selected_id)
+                    if rec:
+                        load_application_into_session(rec, switch_tab=False)
+                st.rerun()
+
+        st.subheader("📄 Your CV / Resume")
+        uploaded_cv = st.file_uploader("Upload CV (PDF)", type=["pdf"], label_visibility="collapsed")
+        if uploaded_cv is not None:
+            try:
+                from src.cv_loader import extract_text_from_pdf
+                pdf_bytes = uploaded_cv.read()
+                st.session_state._pdf_bytes = pdf_bytes
+                st.session_state.cv_text = extract_text_from_pdf(pdf_bytes)
+                st.success("✅ CV loaded successfully")
+            except Exception as exc:
+                st.error(f"Error reading PDF: {exc}")
+        elif st.session_state.cv_text:
+            st.success("✅ CV loaded & ready")
+
+        st.subheader("🎯 Target Job Details")
+        st.session_state.company_name = st.text_input(
+            "Company Name",
+            value=st.session_state.company_name,
+            placeholder="e.g. Google, Stripe, REWE...",
+        )
+        st.session_state.job_title = st.text_input(
+            "Job Title",
+            value=st.session_state.job_title,
+            placeholder="e.g. AI Engineer, Product Manager...",
+        )
+        st.session_state.job_description = st.text_area(
+            "Job Description (JD)",
+            value=st.session_state.job_description,
+            height=200,
+            placeholder="Paste the full job posting requirements and responsibilities here...",
+        )
 
 
 # ---------------------------------------------------------------------------
-# Shared render helpers
+# UI Components & Visualizations
 # ---------------------------------------------------------------------------
 
 def _render_fit_score(score: int, explanation: str) -> None:
-    c1, c2 = st.columns([1, 3])
-    with c1:
-        st.metric("Fit score", f"{score}/100")
+    col_score, col_exp = st.columns([1, 3])
+    with col_score:
+        st.metric(label="Match Fit Score", value=f"{score} / 100")
         st.progress(score / 100)
-    with c2:
-        st.markdown("**Explanation**")
+    with col_exp:
+        st.markdown("**Executive Analysis**")
         st.write(explanation)
 
 
-def _render_skills(required, matching, missing, weak) -> None:
+def _render_skills(required: list, matching: list, missing: list, weak: list) -> None:
     c1, c2, c3 = st.columns(3)
     with c1:
-        st.markdown("**Required skills**")
-        for s in required:
-            st.markdown(f"- {s}")
+        st.markdown("##### 📌 Key Requirements")
+        if required:
+            for s in required:
+                st.markdown(f"- {s}")
+        else:
+            st.caption("None extracted")
+
     with c2:
-        st.markdown("**Matching**")
-        for s in matching:
-            st.markdown(f'<span class="skill-match">- {s}</span>', unsafe_allow_html=True)
+        st.markdown("##### ✅ Matching Skills")
+        if matching:
+            html = "".join([f'<span class="skill-chip skill-match">✓ {s}</span>' for s in matching])
+            st.markdown(html, unsafe_allow_html=True)
+        else:
+            st.caption("No direct matches found")
+
     with c3:
-        st.markdown("**Gaps / weak**")
-        for s in missing:
-            st.markdown(f'<span class="skill-missing">- {s}</span>', unsafe_allow_html=True)
-        for s in weak:
-            st.markdown(f'<span class="skill-weak">- {s} (weak)</span>', unsafe_allow_html=True)
+        st.markdown("##### ⚠️ Gaps & Weak Areas")
+        html_gaps = "".join([f'<span class="skill-chip skill-missing">✗ {s}</span>' for s in missing])
+        html_weak = "".join([f'<span class="skill-chip skill-weak">~ {s} (weak)</span>' for s in weak])
+        if html_gaps or html_weak:
+            st.markdown(html_gaps + html_weak, unsafe_allow_html=True)
+        else:
+            st.caption("No significant gaps identified")
 
 
 def _render_bullet_improvements(bullets: list) -> None:
-    """Render bullet improvements (dict or legacy string format)."""
     if not bullets:
-        st.caption("No bullet improvements yet.")
+        st.caption("No bullet improvements generated yet.")
         return
 
     for i, item in enumerate(bullets, 1):
@@ -294,61 +443,91 @@ def _render_bullet_improvements(bullets: list) -> None:
             st.markdown(f"**{i}.** {item}")
             continue
 
-        with st.container(border=True):
-            st.markdown(f"**Bullet {i}** · Section: {item.get('section', 'Other')}")
-            st.markdown(f"**Original:** {item.get('original_bullet', '—')}")
-            st.markdown(f"**Revised:** {item.get('revised_bullet', '—')}")
-            st.caption(f"Reason: {item.get('reason_for_change', '—')}")
+        section = item.get("section", "Experience")
+        orig = item.get("original_bullet", "—")
+        revised = item.get("revised_bullet", "—")
+        reason = item.get("reason_for_change", "")
+
+        st.markdown(
+            f"""
+            <div class="bullet-card">
+                <span class="bullet-tag">{section}</span>
+                <div class="bullet-diff-orig"><b>Original:</b> {orig}</div>
+                <div class="bullet-diff-new"><b>Tailored:</b> {revised}</div>
+                <small style="color: #64748b;"><b>Rationale:</b> {reason}</small>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 
 def _render_cover_letter(email: str | None, letter: str | None, sections: dict | None = None) -> None:
-    st.markdown("**Application email**")
-    st.text_area("email", value=email or "", height=140, label_visibility="collapsed")
+    tab_letter, tab_email = st.tabs(["📄 Full Cover Letter", "✉️ Short Email"])
 
-    st.markdown("**Cover letter**")
-    if sections:
-        for label, key in [
-            ("Greeting", "greeting"),
-            ("Introduction", "introduction"),
-            ("Why I fit", "why_fit"),
-            ("Relevant skills & projects", "relevant_skills_projects"),
-            ("Closing", "closing"),
-            ("Sign-off", "sign_off"),
-        ]:
-            if sections.get(key):
-                st.markdown(f"*{label}*")
-                st.write(sections[key])
-                st.markdown("")
-    else:
-        st.text_area("letter", value=letter or "", height=360, label_visibility="collapsed")
+    with tab_letter:
+        if sections:
+            for label, key in [
+                ("Greeting", "greeting"),
+                ("Introduction", "introduction"),
+                ("Why I Fit", "why_fit"),
+                ("Relevant Skills & Projects", "relevant_skills_projects"),
+                ("Closing", "closing"),
+                ("Sign-off", "sign_off"),
+            ]:
+                if sections.get(key):
+                    st.markdown(f"**{label}**")
+                    st.write(sections[key])
+        else:
+            st.text_area("Full Letter", value=letter or "", height=350, label_visibility="collapsed")
+
+        if letter:
+            st.download_button(
+                "📥 Download Cover Letter (.txt)",
+                data=letter,
+                file_name=f"cover_letter_{st.session_state.company_name or 'application'}.txt",
+                mime="text/plain",
+            )
+
+    with tab_email:
+        st.text_area("Application Email", value=email or "", height=200, label_visibility="collapsed")
+        if email:
+            st.download_button(
+                "📥 Download Email (.txt)",
+                data=email,
+                file_name=f"email_{st.session_state.company_name or 'application'}.txt",
+                mime="text/plain",
+            )
 
 
 def _render_interview(qa_list: list[dict]) -> None:
     for i, qa in enumerate(qa_list, 1):
-        qtype = qa.get("question_type", "role")
+        qtype = qa.get("question_type", "role").capitalize()
         with st.expander(f"Q{i} [{qtype}] — {qa.get('question', '')}", expanded=(i <= 2)):
-            st.markdown(f"**Answer:** {qa.get('suggested_answer', '')}")
+            st.markdown(f"💡 **Suggested Answer Strategy:**")
+            st.write(qa.get("suggested_answer", ""))
 
 
 # ---------------------------------------------------------------------------
-# Tabs
+# Page Views
 # ---------------------------------------------------------------------------
 
-def tab_upload_analyze() -> None:
-    st.subheader("Upload & Analyze")
+def page_upload_analyze() -> None:
+    st.header("📊 Upload & Analyze Fit")
 
     if not check_api_key():
         return
 
-    if st.button("Analyze application", type="primary", use_container_width=True):
+    analyze_clicked = st.button("🚀 Analyze Application Fit", type="primary", use_container_width=True)
+
+    if analyze_clicked:
         if not st.session_state.cv_text:
-            st.error("Upload your CV first.")
+            st.error("Please upload your CV (PDF) in the sidebar.")
             return
         if not st.session_state.job_description.strip():
-            st.error("Enter a job description.")
+            st.error("Please paste the Job Description in the sidebar.")
             return
 
-        with st.spinner("Analyzing…"):
+        with st.spinner("Analyzing CV match against Job Description..."):
             try:
                 result = analyze_application(
                     job_description=st.session_state.job_description,
@@ -359,53 +538,55 @@ def tab_upload_analyze() -> None:
                 )
                 st.session_state.cv_text = result.cv_text
                 saved = save_new_analysis(result)
-                st.success(f"Saved: {saved.company_name} — {saved.job_title}")
+                st.success(f"🎉 Analysis complete and saved for **{saved.company_name}**!")
                 st.rerun()
             except Exception as exc:
                 st.error(f"Analysis failed: {exc}")
 
+    # Render results if available
     result = st.session_state.get("_analysis")
     record = get_current_record()
 
-    if result:
-        fit = result.fit_analysis
-        jd = result.jd_extraction
+    if result or (record and record.fit_score is not None):
+        st.divider()
+        fit = result.fit_analysis if result else record
+        reqs = result.jd_extraction.extracted_requirements if result else (record.extracted_requirements if record else [])
+        skills = result.jd_extraction.required_skills if result else (record.extracted_skills if record else [])
+
         _render_fit_score(fit.fit_score, fit.fit_score_explanation)
-        _render_skills(jd.required_skills, fit.matching_skills, fit.missing_skills, fit.weak_matches)
-        if jd.extracted_requirements:
-            st.markdown("**Key requirements**")
-            for req in jd.extracted_requirements:
-                st.markdown(f"- {req}")
-    elif record and record.fit_score is not None:
-        _render_fit_score(record.fit_score, record.fit_score_explanation or "")
-        _render_skills(
-            record.extracted_skills,
-            record.matching_skills,
-            record.missing_skills,
-            record.weak_matches,
-        )
-        if record.extracted_requirements:
-            st.markdown("**Key requirements**")
-            for req in record.extracted_requirements:
-                st.markdown(f"- {req}")
+        _render_skills(skills, fit.matching_skills, fit.missing_skills, fit.weak_matches)
+
+        if reqs:
+            with st.expander("📋 Detailed Job Requirements List", expanded=False):
+                for req in reqs:
+                    st.markdown(f"- {req}")
+
+        st.markdown("#### ⚡ Next Steps")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            if st.button("📝 Tailor Resume Bullets", use_container_width=True):
+                set_active_tab("Resume Tailoring")
+                st.rerun()
+        with c2:
+            if st.button("✉️ Draft Cover Letter", use_container_width=True):
+                set_active_tab("Cover Letter")
+                st.rerun()
+        with c3:
+            if st.button("🎯 Prepare for Interview", use_container_width=True):
+                set_active_tab("Interview Prep")
+                st.rerun()
 
 
-def tab_resume_tailoring() -> None:
-    st.subheader("Resume Tailoring")
+def page_resume_tailoring() -> None:
+    st.header("📝 Resume Tailoring")
 
     if not check_api_key() or not require_cv_and_jd():
         return
 
     record = get_current_record()
 
-    if record and record.tailored_summary:
-        st.markdown("**Tailored summary**")
-        st.write(record.tailored_summary)
-        st.markdown("**Bullet improvements**")
-        _render_bullet_improvements(record.tailored_resume_bullets)
-
-    if st.button("Generate tailoring", type="primary", use_container_width=True):
-        with st.spinner("Tailoring resume…"):
+    if st.button("⚡ Generate Tailored Summary & Bullets", type="primary", use_container_width=True):
+        with st.spinner("Crafting tailored resume points..."):
             try:
                 result = tailor_resume(
                     cv_text=st.session_state.cv_text,
@@ -424,24 +605,30 @@ def tab_resume_tailoring() -> None:
                     tailored_summary=result.tailored_summary,
                     tailored_resume_bullets=bullet_dicts,
                 )
+                st.success("Resume tailoring updated!")
                 st.rerun()
             except Exception as exc:
                 st.error(f"Tailoring failed: {exc}")
 
+    record = get_current_record()
+    if record and record.tailored_summary:
+        st.subheader("🎯 Tailored Professional Summary")
+        st.info(record.tailored_summary)
 
-def tab_cover_letter() -> None:
-    st.subheader("Cover Letter")
+        st.subheader("✨ High-Impact Tailored Bullets")
+        _render_bullet_improvements(record.tailored_resume_bullets)
+
+
+def page_cover_letter() -> None:
+    st.header("✉️ Cover Letter & Application Email")
 
     if not check_api_key() or not require_cv_and_jd():
         return
 
     record = get_current_record()
 
-    if record and record.cover_letter:
-        _render_cover_letter(record.cover_letter_email, record.cover_letter)
-
-    if st.button("Generate cover letter", type="primary", use_container_width=True):
-        with st.spinner("Writing cover letter…"):
+    if st.button("⚡ Generate Custom Cover Letter", type="primary", use_container_width=True):
+        with st.spinner("Writing personalized cover letter..."):
             try:
                 bullets_for_prompt = record.tailored_resume_bullets if record else None
                 if bullets_for_prompt:
@@ -462,28 +649,26 @@ def tab_cover_letter() -> None:
                     cover_letter=result.full_cover_letter,
                     cover_letter_email=result.email_message,
                 )
-                _render_cover_letter(
-                    result.email_message,
-                    result.full_cover_letter,
-                    result.sections.model_dump(),
-                )
+                st.success("Cover letter generated!")
+                st.rerun()
             except Exception as exc:
                 st.error(f"Cover letter generation failed: {exc}")
 
+    record = get_current_record()
+    if record and (record.cover_letter or record.cover_letter_email):
+        _render_cover_letter(record.cover_letter_email, record.cover_letter)
 
-def tab_interview_prep() -> None:
-    st.subheader("Interview Prep")
+
+def page_interview_prep() -> None:
+    st.header("🎯 Interview Preparation")
 
     if not check_api_key() or not require_cv_and_jd():
         return
 
     record = get_current_record()
 
-    if record and record.interview_questions_and_answers:
-        _render_interview(record.interview_questions_and_answers)
-
-    if st.button("Generate interview prep", type="primary", use_container_width=True):
-        with st.spinner("Generating questions…"):
+    if st.button("⚡ Generate Interview Questions & Answers", type="primary", use_container_width=True):
+        with st.spinner("Predicting role questions and suggested answers..."):
             try:
                 result = generate_interview_prep(
                     cv_text=st.session_state.cv_text,
@@ -494,93 +679,126 @@ def tab_interview_prep() -> None:
                 )
                 qa_list = [q.model_dump() for q in result.questions]
                 save_current_record(interview_questions_and_answers=qa_list)
+                st.success("Interview prep generated!")
                 st.rerun()
             except Exception as exc:
                 st.error(f"Interview prep failed: {exc}")
 
+    record = get_current_record()
+    if record and record.interview_questions_and_answers:
+        _render_interview(record.interview_questions_and_answers)
 
-def tab_application_tracker() -> None:
-    st.subheader("Application Tracker")
+
+def page_application_tracker() -> None:
+    st.header("📂 Application Tracker")
 
     apps = st.session_state.applications_list
 
     if not apps:
-        st.info("No applications yet. Analyze a job on the Upload & Analyze tab.")
+        st.info("No applications tracked yet. Start by analyzing a job on the **Upload & Analyze** page.")
         return
 
+    # Metrics row
     c1, c2, c3, c4, c5 = st.columns(5)
     counts = {s: sum(1 for a in apps if a.status == s) for s in STATUS_OPTIONS}
-    c1.metric("Total", len(apps))
+    c1.metric("Total Applications", len(apps))
     c2.metric("Applied", counts["applied"])
-    c3.metric("Interview", counts["interview"])
+    c3.metric("Interviews", counts["interview"])
     c4.metric("Offers", counts["offer"])
     c5.metric("Rejected", counts["rejected"])
 
+    st.divider()
+
     for app in apps:
         with st.container(border=True):
-            hc1, hc2, hc3 = st.columns([3, 2, 1])
+            hc1, hc2, hc3 = st.columns([3, 2, 2])
             with hc1:
-                st.markdown(f"**{app.company_name}**")
-                st.caption(f"{app.job_title} · {app.date_created[:10]}")
+                st.markdown(f"### {app.company_name}")
+                st.markdown(f"**{app.job_title}** · *Created: {app.date_created[:10]}*")
             with hc2:
                 if app.fit_score is not None:
-                    st.metric("Fit", f"{app.fit_score}/100")
+                    st.metric("Fit Score", f"{app.fit_score}%")
                 new_status = st.selectbox(
                     "Status",
                     STATUS_OPTIONS,
                     index=STATUS_OPTIONS.index(app.status),
                     format_func=lambda s: STATUS_LABELS[s],
-                    key=f"status_{app.application_id}",
+                    key=f"tracker_status_{app.application_id}",
                 )
                 if new_status != app.status:
                     tracker.set_status(app.application_id, new_status)
                     refresh_applications_cache()
                     st.rerun()
             with hc3:
-                if st.button("Open", key=f"open_{app.application_id}", use_container_width=True):
-                    load_application_into_session(app)
+                st.write("")
+                if st.button("📂 Open Application", key=f"open_btn_{app.application_id}", use_container_width=True, type="primary"):
+                    load_application_into_session(app, switch_tab=True, target_tab="Upload & Analyze")
                     st.rerun()
-                if st.button("Delete", key=f"del_{app.application_id}", use_container_width=True):
+                if st.button("🗑️ Delete", key=f"del_btn_{app.application_id}", use_container_width=True):
                     tracker.delete(app.application_id)
                     if st.session_state.current_app_id == app.application_id:
                         reset_for_new_application()
                     refresh_applications_cache()
                     st.rerun()
 
-            with st.expander("Details"):
-                st.caption(truncate(app.job_description_text, 200))
+            with st.expander("Job Description Preview"):
+                st.caption(truncate(app.job_description_text, 250))
                 if app.extracted_skills:
-                    st.markdown("Skills: " + ", ".join(app.extracted_skills[:6]))
+                    st.markdown("**Skills:** " + ", ".join(app.extracted_skills[:8]))
 
 
 # ---------------------------------------------------------------------------
-# Main
+# Main App Execution
 # ---------------------------------------------------------------------------
 
 def main() -> None:
     init_session_state()
     render_sidebar()
 
-    st.title("Job Application Copilot")
+    # Interactive dynamic navigation
+    if hasattr(st, "pills"):
+        selected_tab = st.pills(
+            "Navigation",
+            options=NAV_TABS,
+            default=st.session_state.active_tab if st.session_state.active_tab in NAV_TABS else NAV_TABS[0],
+            label_visibility="collapsed",
+        )
+    elif hasattr(st, "segmented_control"):
+        selected_tab = st.segmented_control(
+            "Navigation",
+            options=NAV_TABS,
+            default=st.session_state.active_tab if st.session_state.active_tab in NAV_TABS else NAV_TABS[0],
+            label_visibility="collapsed",
+        )
+    else:
+        selected_tab = st.radio(
+            "Navigation",
+            options=NAV_TABS,
+            index=NAV_TABS.index(st.session_state.active_tab) if st.session_state.active_tab in NAV_TABS else 0,
+            horizontal=True,
+            label_visibility="collapsed",
+        )
 
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "Upload & Analyze",
-        "Resume Tailoring",
-        "Cover Letter",
-        "Interview Prep",
-        "Application Tracker",
-    ])
+    # Sync tab state if changed by user click
+    if selected_tab and selected_tab != st.session_state.active_tab:
+        set_active_tab(selected_tab)
+        st.rerun()
 
-    with tab1:
-        tab_upload_analyze()
-    with tab2:
-        tab_resume_tailoring()
-    with tab3:
-        tab_cover_letter()
-    with tab4:
-        tab_interview_prep()
-    with tab5:
-        tab_application_tracker()
+    # Route to active page
+    current_tab = st.session_state.active_tab
+
+    if current_tab == "Upload & Analyze":
+        page_upload_analyze()
+    elif current_tab == "Resume Tailoring":
+        page_resume_tailoring()
+    elif current_tab == "Cover Letter":
+        page_cover_letter()
+    elif current_tab == "Interview Prep":
+        page_interview_prep()
+    elif current_tab == "Application Tracker":
+        page_application_tracker()
+    else:
+        page_upload_analyze()
 
 
 if __name__ == "__main__":
